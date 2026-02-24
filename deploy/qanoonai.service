@@ -1,0 +1,44 @@
+# QanoonAI FastAPI backend — systemd service
+# Place at: /etc/systemd/system/qanoonai.service
+#
+# Commands:
+#   sudo systemctl start qanoonai     — start the service
+#   sudo systemctl stop qanoonai      — stop the service
+#   sudo systemctl restart qanoonai   — hard restart (drops connections)
+#   sudo systemctl reload qanoonai    — graceful reload (zero downtime)
+#   sudo journalctl -u qanoonai -f    — tail logs
+
+[Unit]
+Description=QanoonAI FastAPI Backend
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=qanoonai
+Group=qanoonai
+WorkingDirectory=/home/qanoonai/backend
+
+# Load environment variables (DATABASE_URL, API keys, etc.)
+EnvironmentFile=/home/qanoonai/backend/.env
+
+# Virtual environment activation + gunicorn
+ExecStart=/home/qanoonai/backend/venv/bin/gunicorn app.main:app -c gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Restart on crash, but not if we stopped it intentionally
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateTmp=true
+ReadWritePaths=/home/qanoonai/backend
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
