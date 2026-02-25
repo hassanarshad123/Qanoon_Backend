@@ -152,10 +152,11 @@ async def require_admin(user: Annotated[SessionUser, Depends(get_current_user)])
     return user
 
 
-async def require_role(
-    *roles: str,
-):
-    """Factory for role-checking dependencies."""
+def require_role(*roles: str):
+    """Factory for role-checking dependencies.
+
+    Usage: Depends(require_role("judge")) or Depends(require_role("judge", "lawyer"))
+    """
     async def _check(user: Annotated[SessionUser, Depends(get_current_user)]) -> SessionUser:
         if user.role not in roles:
             raise HTTPException(
