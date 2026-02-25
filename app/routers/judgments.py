@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from typing import Annotated
 from collections.abc import AsyncGenerator
@@ -29,6 +30,8 @@ from app.repositories import briefs as briefs_repo
 from app.repositories import profiles as profiles_repo
 from app.repositories import activity as activity_repo
 from app.services.anthropic_client import get_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/judgments", tags=["judgments"])
 
@@ -141,15 +144,15 @@ async def generate_judgment(
     try:
         results = await rag_search({"query": search_query, "limit": 8})
         rag_results = results
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("RAG search failed for judgment generation: %s", e)
 
     # Get judge profile
     judge_profile: dict | None = None
     try:
         judge_profile = await profiles_repo.get_judge_profile(user.id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to fetch judge profile for user %s: %s", user.id, e)
 
     # Build prompt
     prompt = build_generation_prompt(extracted_data, brief_content, rag_results, judge_profile)
