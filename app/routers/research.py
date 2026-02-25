@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.core.auth import SessionUser, get_current_user
+from app.core.auth import SessionUser, require_role
 from app.models.research import (
     ConversationCreate,
     ConversationMetaUpdate,
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/research", tags=["research"])
 
 @router.get("/conversations")
 async def list_conversations(
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
     search: str | None = Query(None),
     limit: int = Query(default=50, le=200),
 ):
@@ -41,7 +41,7 @@ async def list_conversations(
 @router.post("/conversations")
 async def create_conversation(
     body: ConversationCreate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     conv_id = await research_repo.create_conversation(user.id, body.title, body.case_id, body.mode)
     await activity_repo.log_activity(user.id, "created", "research", conv_id, body.title)
@@ -51,7 +51,7 @@ async def create_conversation(
 @router.get("/conversations/{conv_id}")
 async def get_conversation(
     conv_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     conv = await research_repo.get_conversation(conv_id, user.id)
     if not conv:
@@ -62,7 +62,7 @@ async def get_conversation(
 @router.delete("/conversations/{conv_id}")
 async def delete_conversation(
     conv_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await research_repo.delete_conversation(conv_id, user.id)
     await activity_repo.log_activity(user.id, "deleted", "research", conv_id)
@@ -72,7 +72,7 @@ async def delete_conversation(
 @router.post("/conversations/{conv_id}/pin")
 async def toggle_pin(
     conv_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     pinned = await research_repo.toggle_pin(conv_id, user.id)
     return {"pinned": pinned}
@@ -82,7 +82,7 @@ async def toggle_pin(
 async def update_meta(
     conv_id: str,
     body: ConversationMetaUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await research_repo.update_meta(conv_id, user.id, body.legal_areas, body.case_id)
     return {"success": True}
@@ -91,7 +91,7 @@ async def update_meta(
 @router.get("/conversations/{conv_id}/messages")
 async def get_messages(
     conv_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     return await research_repo.get_messages(conv_id, user.id)
 
@@ -102,7 +102,7 @@ async def get_messages(
 @router.post("/query")
 async def research_query(
     body: ResearchQueryRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     """Handle initial research query: create conversation, RAG search, stream AI response, save."""
     from app.rag.service import search as rag_search
@@ -193,7 +193,7 @@ async def research_query(
 @router.post("/follow-up")
 async def research_follow_up(
     body: ResearchFollowUpRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     """Handle follow-up research query within an existing conversation."""
     from app.rag.service import search as rag_search

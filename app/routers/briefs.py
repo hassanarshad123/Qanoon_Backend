@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import settings
-from app.core.auth import SessionUser, get_current_user
+from app.core.auth import SessionUser, require_role
 from app.core.streaming import stream_anthropic
 from app.models.brief import (
     BriefAnalyzeChunkRequest,
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/briefs", tags=["briefs"])
 @router.post("")
 async def create_brief(
     body: BriefCreate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     brief_id = await briefs_repo.save_brief(user.id, body.model_dump())
     await activity_repo.log_activity(user.id, "created", "brief", brief_id, body.case_title)
@@ -48,12 +48,12 @@ async def create_brief(
 
 
 @router.get("")
-async def list_briefs(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def list_briefs(user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     return await briefs_repo.list_briefs(user.id)
 
 
 @router.get("/{brief_id}")
-async def get_brief(brief_id: str, user: Annotated[SessionUser, Depends(get_current_user)]):
+async def get_brief(brief_id: str, user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     brief = await briefs_repo.get_brief(brief_id, user.id)
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
@@ -64,7 +64,7 @@ async def get_brief(brief_id: str, user: Annotated[SessionUser, Depends(get_curr
 async def update_brief_status(
     brief_id: str,
     body: BriefStatusUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await briefs_repo.update_brief_status(brief_id, user.id, body.status)
     if body.status == "finalized":
@@ -73,7 +73,7 @@ async def update_brief_status(
 
 
 @router.delete("/{brief_id}")
-async def delete_brief(brief_id: str, user: Annotated[SessionUser, Depends(get_current_user)]):
+async def delete_brief(brief_id: str, user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     await briefs_repo.delete_brief(brief_id, user.id)
     await activity_repo.log_activity(user.id, "deleted", "brief", brief_id)
     return {"success": True}
@@ -83,7 +83,7 @@ async def delete_brief(brief_id: str, user: Annotated[SessionUser, Depends(get_c
 async def update_section_review(
     section_id: str,
     body: SectionReviewUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await briefs_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
     return {"success": True}
@@ -93,7 +93,7 @@ async def update_section_review(
 async def update_section_content(
     section_id: str,
     body: SectionContentUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await briefs_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
     return {"success": True}
@@ -103,7 +103,7 @@ async def update_section_content(
 async def save_chat_message(
     brief_id: str,
     body: ChatMessage,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     msg_id = await briefs_repo.save_chat_message(brief_id, user.id, body.role, body.content, body.citations)
     return {"id": msg_id}
@@ -115,7 +115,7 @@ async def save_chat_message(
 @router.post("/generate")
 async def generate_brief(
     body: BriefGenerateRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     prompt = build_generation_prompt(body.extracted_data, body.rag_results)
     return await stream_anthropic(
@@ -128,7 +128,7 @@ async def generate_brief(
 @router.post("/chat-stream")
 async def chat_stream(
     body: BriefChatStreamRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     system, messages = build_chat_prompt(
         body.brief_context,
@@ -146,7 +146,7 @@ async def chat_stream(
 @router.post("/regenerate")
 async def regenerate_section(
     body: BriefRegenerateRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     prompt = build_regeneration_prompt(
         body.section_title,
@@ -164,7 +164,7 @@ async def regenerate_section(
 @router.post("/analyze")
 async def analyze_documents(
     body: BriefAnalyzeRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     if not body.documents:
         raise HTTPException(status_code=400, detail="No documents provided")
@@ -196,7 +196,7 @@ async def analyze_documents(
 @router.post("/analyze-chunk")
 async def analyze_chunk(
     body: BriefAnalyzeChunkRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     if not body.documents:
         raise HTTPException(status_code=400, detail="No documents provided")
@@ -229,7 +229,7 @@ async def analyze_chunk(
 @router.post("/precedents")
 async def find_precedents(
     body: BriefPrecedentsRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     from app.rag.service import search as rag_search
 

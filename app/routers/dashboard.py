@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.core.auth import SessionUser, get_current_user
+from app.core.auth import SessionUser, require_role
 from app.repositories import profiles as profiles_repo
 from app.repositories import activity as activity_repo
 from app.repositories.base import fetch_one, fetch_all
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/judge")
-async def judge_dashboard(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def judge_dashboard(user: Annotated[SessionUser, Depends(require_role("judge", "admin"))]):
     uid = user.id
 
     profile = await profiles_repo.get_or_create_judge_profile(uid)
@@ -65,7 +65,7 @@ async def judge_dashboard(user: Annotated[SessionUser, Depends(get_current_user)
 
 
 @router.get("/lawyer")
-async def lawyer_dashboard(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def lawyer_dashboard(user: Annotated[SessionUser, Depends(require_role("lawyer", "admin"))]):
     uid = user.id
 
     profile = await profiles_repo.get_or_create_lawyer_profile(uid)

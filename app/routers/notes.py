@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.auth import SessionUser, get_current_user
+from app.core.auth import SessionUser, require_role
 from app.models.notes import (
     NoteCreate,
     NoteContentUpdate,
@@ -23,7 +23,7 @@ router = APIRouter(tags=["notes"])
 @router.post("/notes")
 async def create_note(
     body: NoteCreate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     note_id = await notes_repo.create_note(user.id, body.model_dump())
     await activity_repo.log_activity(user.id, "created", "note", note_id, body.title)
@@ -31,14 +31,14 @@ async def create_note(
 
 
 @router.get("/notes")
-async def list_notes(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def list_notes(user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     return await notes_repo.list_notes(user.id)
 
 
 @router.get("/notes/{note_id}")
 async def get_note(
     note_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     note = await notes_repo.get_note(note_id, user.id)
     if not note:
@@ -50,7 +50,7 @@ async def get_note(
 async def update_note_content(
     note_id: str,
     body: NoteContentUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     return await notes_repo.update_note_content(note_id, user.id, body.content)
 
@@ -59,7 +59,7 @@ async def update_note_content(
 async def update_note_title(
     note_id: str,
     body: NoteTitleUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     return await notes_repo.update_note_title(note_id, user.id, body.title)
 
@@ -68,7 +68,7 @@ async def update_note_title(
 async def update_note_metadata(
     note_id: str,
     body: NoteMetadataUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await notes_repo.update_note_metadata(note_id, user.id, body.folder, body.tags)
     return {"success": True}
@@ -77,7 +77,7 @@ async def update_note_metadata(
 @router.delete("/notes/{note_id}")
 async def delete_note(
     note_id: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await notes_repo.delete_note(note_id, user.id)
     await activity_repo.log_activity(user.id, "deleted", "note", note_id)
@@ -89,14 +89,14 @@ async def delete_note(
 # ---------------------------------------------------------------------------
 
 @router.get("/folders")
-async def list_folders(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def list_folders(user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     return await notes_repo.list_folders(user.id)
 
 
 @router.post("/folders")
 async def create_folder(
     body: FolderCreate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     folder_id = await notes_repo.create_folder(user.id, body.name)
     return {"id": folder_id}
@@ -105,7 +105,7 @@ async def create_folder(
 @router.delete("/folders/{name}")
 async def delete_folder(
     name: str,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
     await notes_repo.delete_folder(user.id, name)
     return {"success": True}
@@ -116,5 +116,5 @@ async def delete_folder(
 # ---------------------------------------------------------------------------
 
 @router.get("/tags")
-async def get_tags(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def get_tags(user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
     return await notes_repo.get_tags()

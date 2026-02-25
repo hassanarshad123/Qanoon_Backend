@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.core.auth import SessionUser, get_current_user
+from app.core.auth import SessionUser, require_role
 from app.core.streaming import stream_anthropic
 from app.models.judgment import (
     JudgmentChatMessage,
@@ -39,7 +39,7 @@ router = APIRouter(prefix="/judgments", tags=["judgments"])
 @router.post("")
 async def create_judgment(
     body: JudgmentCreate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     jid = await judgments_repo.create_judgment(user.id, body.model_dump())
     await activity_repo.log_activity(user.id, "created", "judgment", jid, body.case_title)
@@ -47,12 +47,12 @@ async def create_judgment(
 
 
 @router.get("")
-async def list_judgments(user: Annotated[SessionUser, Depends(get_current_user)]):
+async def list_judgments(user: Annotated[SessionUser, Depends(require_role("judge", "admin"))]):
     return await judgments_repo.list_judgments(user.id)
 
 
 @router.get("/{judgment_id}")
-async def get_judgment(judgment_id: str, user: Annotated[SessionUser, Depends(get_current_user)]):
+async def get_judgment(judgment_id: str, user: Annotated[SessionUser, Depends(require_role("judge", "admin"))]):
     j = await judgments_repo.get_judgment(judgment_id, user.id)
     if not j:
         raise HTTPException(status_code=404, detail="Judgment not found")
@@ -63,7 +63,7 @@ async def get_judgment(judgment_id: str, user: Annotated[SessionUser, Depends(ge
 async def update_status(
     judgment_id: str,
     body: JudgmentStatusUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     await judgments_repo.update_status(judgment_id, user.id, body.status)
     if body.status == "finalized":
@@ -72,7 +72,7 @@ async def update_status(
 
 
 @router.delete("/{judgment_id}")
-async def delete_judgment(judgment_id: str, user: Annotated[SessionUser, Depends(get_current_user)]):
+async def delete_judgment(judgment_id: str, user: Annotated[SessionUser, Depends(require_role("judge", "admin"))]):
     await judgments_repo.delete_judgment(judgment_id, user.id)
     await activity_repo.log_activity(user.id, "deleted", "judgment", judgment_id)
     return {"success": True}
@@ -82,7 +82,7 @@ async def delete_judgment(judgment_id: str, user: Annotated[SessionUser, Depends
 async def update_section_content(
     section_id: str,
     body: JudgmentSectionContentUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     await judgments_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
     return {"success": True}
@@ -92,7 +92,7 @@ async def update_section_content(
 async def update_section_review(
     section_id: str,
     body: JudgmentSectionReviewUpdate,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     await judgments_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
     return {"success": True}
@@ -102,7 +102,7 @@ async def update_section_review(
 async def save_chat(
     judgment_id: str,
     body: JudgmentChatMessage,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     msg_id = await judgments_repo.save_chat(judgment_id, user.id, body.role, body.content, body.citations)
     return {"id": msg_id}
@@ -114,7 +114,7 @@ async def save_chat(
 @router.post("/generate")
 async def generate_judgment(
     body: JudgmentGenerateRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     """Generate a judgment with RAG search, streaming, section parsing, and DB save."""
     from app.rag.service import search as rag_search
@@ -198,7 +198,7 @@ async def generate_judgment(
 @router.post("/chat-stream")
 async def chat_stream(
     body: JudgmentChatStreamRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     system, messages = build_chat_prompt(
         body.judgment_context,
@@ -216,7 +216,7 @@ async def chat_stream(
 @router.post("/regenerate")
 async def regenerate_section(
     body: JudgmentRegenerateRequest,
-    user: Annotated[SessionUser, Depends(get_current_user)],
+    user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
     prompt = build_regeneration_prompt(
         body.section_title,
