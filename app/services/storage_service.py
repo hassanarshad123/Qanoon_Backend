@@ -34,6 +34,22 @@ async def upload_file(key: str, data: bytes, content_type: str) -> str:
     return f"https://{settings.aws_s3_bucket}.s3.{settings.aws_s3_region}.amazonaws.com/{key}"
 
 
+async def download_file(key: str):
+    """Download a file from S3. Returns (body_stream, content_type, content_length) or None."""
+    client = _get_client()
+    try:
+        response = client.get_object(Bucket=settings.aws_s3_bucket, Key=key)
+        return (
+            response["Body"],
+            response["ContentType"],
+            response["ContentLength"],
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            return None
+        raise
+
+
 async def delete_file(url: str) -> None:
     """Delete a file from S3 by its URL."""
     client = _get_client()

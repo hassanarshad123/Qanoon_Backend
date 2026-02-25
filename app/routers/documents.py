@@ -2,16 +2,23 @@ import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.core.auth import SessionUser, require_role
 from app.models.documents import DocumentLinkUpdate
 from app.repositories import documents as docs_repo
 from app.repositories import activity as activity_repo
-from app.services.storage_service import upload_file, delete_file
+from app.services.storage_service import upload_file, download_file, delete_file
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+
+def _secure_url(doc: dict) -> dict:
+    """Replace S3 URL with authenticated download endpoint."""
+    doc["blob_url"] = f"/api/v1/documents/{doc['id']}/download"
+    return doc
 
 
 @router.post("/upload", status_code=201)
@@ -43,7 +50,7 @@ async def upload_document(
 
     await activity_repo.log_activity(user.id, "created", "document", doc_id, title)
 
-    return {"id": doc_id, "blob_url": blob_url, "file_name": file.filename}
+    return {"id": doc_id, "blob_url": f"/api/v1/documents/{doc_id}/download", "file_name": file.filename}
 
 
 @router.get("")
@@ -52,7 +59,37 @@ async def list_documents(
     document_type: str | None = Query(None),
     search: str | None = Query(None),
 ):
-    return await docs_repo.list_documents(user.id, document_type, search)
+    docs = await docs_repo.list_documents(user.id, document_type, search)
+    return [_secure_url(d) for d in docs]
+
+
+@router.get("/{doc_id}/download")
+async def download_document(
+    doc_id: str,
+    user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
+):
+    doc = await docs_repo.get_document(doc_id, user.id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    result = await download_file(doc["blob_pathname"])
+    if result is None:
+        raise HTTPException(status_code=404, detail="File not found in storage")
+
+    body, content_type, content_length = result
+
+    def iterfile():
+        for chunk in body.iter_chunks(chunk_size=8192):
+            yield chunk
+
+    return StreamingResponse(
+        iterfile(),
+        media_type=content_type,
+        headers={
+            "Content-Length": str(content_length),
+            "Content-Disposition": f'inline; filename="{doc["file_name"]}"',
+        },
+    )
 
 
 @router.get("/{doc_id}")
@@ -63,7 +100,7 @@ async def get_document(
     doc = await docs_repo.get_document(doc_id, user.id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    return _secure_url(doc)
 
 
 @router.delete("/{doc_id}")
