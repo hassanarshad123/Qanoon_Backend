@@ -52,7 +52,10 @@ async def update_note_content(
     body: NoteContentUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    return await notes_repo.update_note_content(note_id, user.id, body.content)
+    try:
+        return await notes_repo.update_note_content(note_id, user.id, body.content)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Note not found")
 
 
 @router.patch("/notes/{note_id}/title")
@@ -61,7 +64,10 @@ async def update_note_title(
     body: NoteTitleUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    return await notes_repo.update_note_title(note_id, user.id, body.title)
+    try:
+        return await notes_repo.update_note_title(note_id, user.id, body.title)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Note not found")
 
 
 @router.patch("/notes/{note_id}/metadata")
@@ -70,7 +76,10 @@ async def update_note_metadata(
     body: NoteMetadataUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    await notes_repo.update_note_metadata(note_id, user.id, body.folder, body.tags)
+    try:
+        await notes_repo.update_note_metadata(note_id, user.id, body.folder, body.tags)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Note not found")
     return {"success": True}
 
 

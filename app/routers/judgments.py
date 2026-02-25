@@ -87,7 +87,10 @@ async def update_section_content(
     body: JudgmentSectionContentUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
-    await judgments_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
+    try:
+        await judgments_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Section not found")
     return {"success": True}
 
 
@@ -97,7 +100,10 @@ async def update_section_review(
     body: JudgmentSectionReviewUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
-    await judgments_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
+    try:
+        await judgments_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Section not found")
     return {"success": True}
 
 
@@ -107,7 +113,10 @@ async def save_chat(
     body: JudgmentChatMessage,
     user: Annotated[SessionUser, Depends(require_role("judge", "admin"))],
 ):
-    msg_id = await judgments_repo.save_chat(judgment_id, user.id, body.role, body.content, body.citations)
+    try:
+        msg_id = await judgments_repo.save_chat(judgment_id, user.id, body.role, body.content, body.citations)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Judgment not found")
     return {"id": msg_id}
 
 
@@ -154,8 +163,21 @@ async def generate_judgment(
     except Exception as e:
         logger.warning("Failed to fetch judge profile for user %s: %s", user.id, e)
 
+    # Transform raw rag_search results into the format expected by build_generation_prompt
+    prompt_rag_results = [
+        {
+            "precedent": {
+                "caseName": r.get("case_name", r.get("caseName", "")),
+                "citation": r.get("citation", ""),
+                "ratio": r.get("ratio", ""),
+            },
+            "relevanceScore": int((r.get("score", 0) or 0) * 100),
+        }
+        for r in rag_results
+    ]
+
     # Build prompt
-    prompt = build_generation_prompt(extracted_data, brief_content, rag_results, judge_profile)
+    prompt = build_generation_prompt(extracted_data, brief_content, prompt_rag_results, judge_profile)
 
     # Build pre-events with RAG results
     pre_events = [

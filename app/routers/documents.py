@@ -91,5 +91,8 @@ async def link_document(
     body: DocumentLinkUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
+    doc = await docs_repo.get_document(doc_id, user.id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
     await docs_repo.link_document(doc_id, user.id, body.brief_id, body.judgment_id)
     return {"success": True}

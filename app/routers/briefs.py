@@ -85,7 +85,10 @@ async def update_section_review(
     body: SectionReviewUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    await briefs_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
+    try:
+        await briefs_repo.update_section_review(section_id, user.id, body.status, body.flag_note)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Section not found")
     return {"success": True}
 
 
@@ -95,7 +98,10 @@ async def update_section_content(
     body: SectionContentUpdate,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    await briefs_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
+    try:
+        await briefs_repo.update_section_content(section_id, user.id, body.content, body.increment_regeneration)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Section not found")
     return {"success": True}
 
 
@@ -105,7 +111,10 @@ async def save_chat_message(
     body: ChatMessage,
     user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))],
 ):
-    msg_id = await briefs_repo.save_chat_message(brief_id, user.id, body.role, body.content, body.citations)
+    try:
+        msg_id = await briefs_repo.save_chat_message(brief_id, user.id, body.role, body.content, body.citations)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Brief not found")
     return {"id": msg_id}
 
 
