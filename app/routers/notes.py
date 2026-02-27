@@ -35,6 +35,12 @@ async def list_notes(user: Annotated[SessionUser, Depends(require_role("judge", 
     return await notes_repo.list_notes(user.id)
 
 
+@router.get("/notes/tags")
+async def get_note_tags(user: Annotated[SessionUser, Depends(require_role("judge", "lawyer", "admin"))]):
+    """Also handle /notes/tags to prevent {note_id} catching 'tags'."""
+    return await notes_repo.get_tags()
+
+
 @router.get("/notes/{note_id}")
 async def get_note(
     note_id: str,
@@ -121,7 +127,7 @@ async def delete_folder(
 
 
 # ---------------------------------------------------------------------------
-# Tags
+# Tags (also served at /notes/tags above to prevent route collision)
 # ---------------------------------------------------------------------------
 
 @router.get("/tags")

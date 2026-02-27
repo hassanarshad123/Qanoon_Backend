@@ -109,9 +109,6 @@ async def get_current_user(request: Request) -> SessionUser:
     Usage: `user: SessionUser = Depends(get_current_user)`
     """
     token = _extract_session_token(request)
-    cookie_names = list(request.cookies.keys())
-    logger.warning("AUTH_DEBUG: cookies=%s, token_found=%s, token_prefix=%s",
-                    cookie_names, bool(token), token[:20] + "..." if token else "None")
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

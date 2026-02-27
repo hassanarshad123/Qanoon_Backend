@@ -1,11 +1,19 @@
+import logging
+
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from app.config import settings
 
+logger = logging.getLogger("qanoonai")
+
 
 async def send_password_reset_email(email: str, token: str) -> None:
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("SMTP not configured — password reset email not sent to %s", email)
+        return
+
     base_url = settings.frontend_url
     reset_url = f"{base_url}/reset-password?token={token}"
 
@@ -27,9 +35,6 @@ async def send_password_reset_email(email: str, token: str) -> None:
     """
 
     msg.attach(MIMEText(html, "html"))
-
-    if not settings.smtp_host or not settings.smtp_user:
-        raise RuntimeError("SMTP not configured")
 
     await aiosmtplib.send(
         msg,

@@ -164,14 +164,15 @@ async def generate_judgment(
         logger.warning("Failed to fetch judge profile for user %s: %s", user.id, e)
 
     # Transform raw rag_search results into the format expected by build_generation_prompt
+    # RAG results have nested structure: {"judgment": {case_name, citation, ...}, "relevance_score": ...}
     prompt_rag_results = [
         {
             "precedent": {
-                "caseName": r.get("case_name", r.get("caseName", "")),
-                "citation": r.get("citation", ""),
-                "ratio": r.get("ratio", ""),
+                "caseName": r.get("judgment", {}).get("case_name", ""),
+                "citation": r.get("judgment", {}).get("citation", ""),
+                "ratio": r.get("judgment", {}).get("ratio", ""),
             },
-            "relevanceScore": int((r.get("score", 0) or 0) * 100),
+            "relevanceScore": r.get("relevance_score", 0),
         }
         for r in rag_results
     ]
@@ -179,16 +180,16 @@ async def generate_judgment(
     # Build prompt
     prompt = build_generation_prompt(extracted_data, brief_content, prompt_rag_results, judge_profile)
 
-    # Build pre-events with RAG results
+    # Build pre-events with RAG results (keys from rag_search are snake_case)
     pre_events = [
         {
             "meta": {
                 "ragResults": [
                     {
-                        "precedent": r.get("judgment", r),
-                        "relevanceScore": r.get("relevanceScore", r.get("score", 0)),
-                        "matchedKeywords": r.get("matchedKeywords", []),
-                        "matchedAreas": r.get("matchedAreas", []),
+                        "precedent": r.get("judgment", {}),
+                        "relevanceScore": r.get("relevance_score", 0),
+                        "matchedKeywords": r.get("matched_keywords", []),
+                        "matchedAreas": r.get("matched_areas", []),
                     }
                     for r in rag_results
                 ],
